@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 # load data
-data = pd.read_csv('../data/trained_data.csv')
+data = pd.read_csv('data/trained_data.csv')
 df = pd.DataFrame(data)
 
 # create a function to find bikes based on discipline, frame size, and riding style
@@ -29,14 +29,40 @@ def height_to_size(feet, inches):
 
 st.title('BikeFinder')
 
-# Example: let user input height
-feet = st.number_input("Feet", min_value=4, max_value=7, step=1)
-inches = st.number_input("Inches", min_value=0, max_value=11, step=1)
+# get user height
+feet = st.number_input("Feet", min_value=4, max_value=7, step=1, value=5)
+inches = st.number_input("Inches", min_value=0, max_value=11, step=1, value=8)
 
+size = None
 if st.button("Find my size"):
     size = height_to_size(feet, inches)
-    st.write(f"Your frame size is likely: **{size}**")
+    st.success(f"Your frame size is likely: **{size}**")
 
-    # Filter dataset
-    results = df[df['Frame Size'] == size]
-    st.dataframe(results)
+if size is None:
+    pass
+
+# get user discipline type and riding style
+disciplines = sorted(df['Discipline'].dropna().unique().tolist())
+styles = sorted(df['Riding Style'].dropna().unique().tolist())
+
+discipline = st.selectbox("Select discipline", disciplines if disciplines else ["Trail"])
+style = st.selectbox("Select riding style", styles if styles else ["Balanced", "Aggressive", "Playful"])
+
+# recommend bikes based on user input
+if st.button("Find bikes"):
+    # if size wasn't computed yet, compute it now
+    if size is None:
+        size = height_to_size(feet, inches)
+
+    st.write(f"Looking for **{discipline}** bikes, size **{size}**, style **{style}**…")
+    results = find_bikes(df, discipline, size, style)
+
+    if results.empty:
+        st.warning("No exact matches found. Try another style or discipline, or broaden size.")
+        alt = df[(df['Discipline'] == discipline) & (df['Frame Size'] == size)]
+        if not alt.empty:
+            st.info("Closest matches (same size + discipline, any style):")
+            st.dataframe(alt.head(50))
+    else:
+        st.success(f"Found {len(results)} bikes:")
+        st.dataframe(results.head(50))  # show first 50 for speed
